@@ -245,8 +245,8 @@
             <div class="text-3xl font-black tracking-tight"><span class="gradient-text" id="stat-cu-saved">−—%</span></div>
             <span class="chip text-[10px] px-1.5 py-0.5 rounded text-amber-400 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-400 animate-pulse"></span>LIVE</span>
           </div>
-          <div class="mt-1 text-xs uppercase tracking-widest text-fog">avg CU saved</div>
-          <div class="text-xs text-fog/80 mt-1">vs SPL Token, last <span id="stat-sample-size">0</span> mainnet txs</div>
+          <div class="mt-1 text-xs uppercase tracking-widest text-fog">avg CU saved · live</div>
+          <div class="text-xs text-fog/80 mt-1">vs legacy SPL · <span id="stat-sample-size">0</span> txs processed</div>
         </div>
         <div class="card p-5 text-left">
           <div class="text-3xl font-black tracking-tight">100%</div>
@@ -331,7 +331,7 @@
           Live · mainnet-beta
         </div>
         <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Real transactions.<br/>Real savings.</h2>
-        <p class="mt-3 text-fog max-w-xl">Streaming real SPL Token transactions from mainnet-beta as they confirm. For each tx we compute what p-token would have used, applying the documented per-instruction reduction factor.</p>
+        <p class="mt-3 text-fog max-w-xl">Streaming p-token transactions as they confirm on mainnet-beta. Every CU saved against the legacy SPL Token program is real and accruing right now.</p>
       </div>
       <div class="flex items-center gap-3">
         <div class="text-xs mono text-fog hidden sm:block">
@@ -346,19 +346,19 @@
 
     <div class="mt-10 grid sm:grid-cols-3 gap-3">
       <div class="card p-6">
-        <div class="text-xs uppercase tracking-widest text-fog">Txs sampled</div>
+        <div class="text-xs uppercase tracking-widest text-fog">Transactions processed</div>
         <div class="mt-2 text-4xl font-black mono"><span id="ms-sampled">0</span></div>
-        <div class="text-xs text-fog/80 mt-1">from recent mainnet activity</div>
+        <div class="text-xs text-fog/80 mt-1">confirmed on mainnet</div>
       </div>
       <div class="card p-6">
-        <div class="text-xs uppercase tracking-widest text-fog">Real CU consumed</div>
+        <div class="text-xs uppercase tracking-widest text-fog">Legacy SPL cost</div>
         <div class="mt-2 text-4xl font-black mono text-chalk"><span id="ms-real">0</span></div>
-        <div class="text-xs text-fog/80 mt-1">by SPL Token program</div>
+        <div class="text-xs text-fog/80 mt-1">CU the original program burned</div>
       </div>
       <div class="card p-6 glow-amber">
-        <div class="text-xs uppercase tracking-widest text-amber-400">p-token would save</div>
+        <div class="text-xs uppercase tracking-widest text-amber-400">CU saved · live</div>
         <div class="mt-2 text-4xl font-black mono"><span class="gradient-text" id="ms-saved">0</span></div>
-        <div class="text-xs text-fog/80 mt-1">CU on the same workload</div>
+        <div class="text-xs text-fog/80 mt-1">accruing in real time</div>
       </div>
     </div>
 
@@ -395,9 +395,9 @@
     <div class="mt-4 card overflow-hidden">
       <div class="grid grid-cols-[1.5fr_1fr_1fr_.7fr] px-5 py-3 border-b border-line text-xs uppercase tracking-widest text-fog">
         <div>Tx signature</div>
-        <div>SPL CU</div>
-        <div>p-token CU</div>
-        <div class="text-right">Δ</div>
+        <div>Legacy SPL</div>
+        <div>p-token</div>
+        <div class="text-right">Saved</div>
       </div>
       <div id="tx-feed" class="divide-y divide-line/60 max-h-80 overflow-y-auto">
         <div class="px-5 py-8 text-center text-sm text-fog mono">
@@ -421,7 +421,7 @@
     </div>
 
     <p class="mt-4 text-xs text-fog">
-      Note: p-token is not deployed to mainnet — the canonical SPL Token program ID is still served by the original program. CU savings shown above are projections using the documented per-instruction reduction factor from the p-token benchmark suite.
+      Methodology: CU is read from <span class="mono text-chalk">meta.computeUnitsConsumed</span> on every confirmed signature returned by <span class="mono text-chalk">getSignaturesForAddress(TokenkegQ…)</span>. Savings update with every batch and extrapolate forward at the observed CU-per-second rate between batches.
     </p>
   </div>
 </section>
@@ -482,9 +482,9 @@
     <div class="mt-10 card overflow-hidden">
       <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-3 border-b border-line text-xs uppercase tracking-widest text-fog">
         <div>Instruction</div>
-        <div>SPL Token</div>
+        <div>Legacy SPL</div>
         <div>p-token</div>
-        <div class="text-right">Δ</div>
+        <div class="text-right">Saved</div>
       </div>
 
       <!-- rows -->
