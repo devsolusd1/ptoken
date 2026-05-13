@@ -195,18 +195,19 @@
   <div class="absolute inset-0 grid-bg pointer-events-none"></div>
   <div class="max-w-7xl mx-auto px-5 pt-20 pb-20 relative">
     <div class="flex flex-col items-center text-center">
-      <div class="chip inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs text-fog">
-        <span class="mono text-amber-400">solana-program/token</span>
+      <div class="chip inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs">
+        <span class="w-1.5 h-1.5 rounded-full bg-mint animate-pulse"></span>
+        <span class="text-chalk font-semibold">First real p-token on Solana</span>
         <span class="text-line">·</span>
-        <span>pinocchio/program</span>
+        <span class="text-fog mono">live on mainnet</span>
       </div>
       <h1 class="mt-6 text-5xl md:text-7xl font-black tracking-tight leading-[0.95] max-w-4xl">
         SPL Token, <span class="gradient-text">reimplemented</span><br/>
         in Pinocchio.
       </h1>
       <p class="mt-6 max-w-2xl text-lg text-fog">
-        A <span class="text-chalk">drop-in</span>, byte-for-byte compatible implementation of the SPL Token program built on the
-        <a class="text-amber-400 hover:underline" href="#why">Pinocchio</a> framework — <span class="text-chalk">no_std</span>, zero-copy, and dramatically lighter on compute units.
+        Drop-in SPL Token on <a class="text-amber-400 hover:underline" href="#why">Pinocchio</a>.
+        <span class="text-chalk">no_std</span>, zero-copy, byte-for-byte compatible.
       </p>
 
       <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -361,7 +362,37 @@
       </div>
     </div>
 
-    <div class="mt-6 card overflow-hidden">
+    <!-- Network telemetry -->
+    <div class="mt-4 card overflow-hidden">
+      <div class="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-line/60">
+        <div class="p-4">
+          <div class="text-[10px] uppercase tracking-widest text-fog">RPC endpoint</div>
+          <div class="mt-1.5 mono text-sm text-chalk truncate" id="tel-rpc">—</div>
+          <div class="text-[10px] mono text-fog mt-0.5"><span id="tel-latency" class="text-amber-400">—</span> ms · last call</div>
+        </div>
+        <div class="p-4">
+          <div class="text-[10px] uppercase tracking-widest text-fog">Block height</div>
+          <div class="mt-1.5 mono text-sm text-chalk" id="tel-block">—</div>
+          <div class="text-[10px] mono text-fog mt-0.5">finalized commitment</div>
+        </div>
+        <div class="p-4">
+          <div class="text-[10px] uppercase tracking-widest text-fog">Epoch</div>
+          <div class="mt-1.5 mono text-sm text-chalk"><span id="tel-epoch">—</span></div>
+          <div class="mt-2 h-1.5 rounded-full bg-line overflow-hidden">
+            <div class="h-full bg-amber-400 transition-all duration-300" id="tel-epoch-bar" style="width: 0%"></div>
+          </div>
+          <div class="text-[10px] mono text-fog mt-1"><span id="tel-epoch-pct">—</span>% complete</div>
+        </div>
+        <div class="p-4">
+          <div class="text-[10px] uppercase tracking-widest text-fog">Priority fee p50</div>
+          <div class="mt-1.5 mono text-sm text-chalk"><span id="tel-prio">—</span> <span class="text-fog text-xs">μlam/CU</span></div>
+          <div class="text-[10px] mono text-fog mt-0.5">recent prioritization fees</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tx feed -->
+    <div class="mt-4 card overflow-hidden">
       <div class="grid grid-cols-[1.5fr_1fr_1fr_.7fr] px-5 py-3 border-b border-line text-xs uppercase tracking-widest text-fog">
         <div>Tx signature</div>
         <div>SPL CU</div>
@@ -373,6 +404,19 @@
           <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-2"></span>
           connecting to mainnet-beta…
         </div>
+      </div>
+    </div>
+
+    <!-- Instruction breakdown -->
+    <div class="mt-4 card p-5">
+      <div class="flex items-end justify-between mb-4">
+        <div>
+          <div class="text-xs uppercase tracking-[0.18em] text-amber-400">Instruction breakdown</div>
+          <div class="text-[11px] text-fog mt-0.5">Parsed from <span id="ix-count" class="text-chalk mono">0</span> SPL Token instructions in the current sample</div>
+        </div>
+      </div>
+      <div id="ix-bars" class="space-y-2.5">
+        <div class="text-xs text-fog mono py-2">no instructions parsed yet…</div>
       </div>
     </div>
 
@@ -389,9 +433,8 @@
       <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Why Pinocchio</div>
       <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Strings attached.<br/>To compute units only.</h2>
       <p class="mt-5 text-fog text-lg">
-        Pinocchio is a minimal Solana program framework that skips <span class="mono text-chalk">solana-program</span>
-        entirely. No heap. No bincode. No abstractions you don't pay for.
-        p-token uses it to deliver the exact same SPL Token interface — with dramatically less work per instruction.
+        Minimal Solana framework that skips <span class="mono text-chalk">solana-program</span> entirely.
+        No heap. No bincode. Just syscalls and pointers.
       </p>
     </div>
 
@@ -535,8 +578,8 @@
       <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Drop-in compatible</div>
       <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Same program ID.<br/>Same accounts. <span class="gradient-text">Same client code.</span></h2>
       <p class="mt-5 text-fog">
-        p-token deploys to the canonical SPL Token program ID. Every instruction tag, every account, every error code is preserved.
-        Replace at the runtime level — your dApps, your wallet, your indexer don't know the difference. Except your transactions are cheaper.
+        Deploys to the canonical SPL Token program ID. Every instruction tag, every account, every error code preserved.
+        Wallets and indexers don't know the difference.
       </p>
       <ul class="mt-6 space-y-2.5 text-sm">
         <li class="flex items-start gap-2"><span class="text-mint mt-0.5">✓</span><span><span class="text-chalk">Program ID</span> <span class="mono text-fog break-all">TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA</span></span></li>
@@ -669,7 +712,7 @@
       <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Architecture</div>
       <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Thin, predictable, no surprises.</h2>
       <p class="mt-5 text-fog">
-        The entrypoint dispatches on the first instruction byte. Each processor owns one file. Shared validation lives in <span class="mono text-chalk">processor/shared</span>. State types map directly to on-chain bytes — no <span class="mono text-chalk">#[derive(Serialize)]</span> in sight.
+        Entrypoint dispatches on the first instruction byte. One file per processor. State maps directly to on-chain bytes.
       </p>
       <ul class="mt-6 space-y-2 text-sm text-fog">
         <li><span class="mono text-chalk">entrypoint.rs</span> — dispatch table, ~80 LOC</li>
@@ -716,7 +759,7 @@
     <div class="card p-6 md:col-span-2 glow-amber">
       <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Audit</div>
       <h3 class="mt-2 text-2xl md:text-3xl font-black tracking-tight">Audited by OtterSec.<br/>Differential-fuzzed against SPL Token 3.5.0.</h3>
-      <p class="mt-3 text-fog">Every processor is fuzz-tested with random inputs across both p-token and the reference SPL Token program. Behavior must match bit-for-bit: same logs, same account writes, same returned error code.</p>
+      <p class="mt-3 text-fog">Every processor is fuzz-tested against the reference SPL Token program. Behavior matches bit-for-bit: same logs, same account writes, same error codes.</p>
       <div class="mt-5 flex flex-wrap gap-2">
         <a href="#" class="btn btn-ghost">Read audit (PDF)</a>
         <a href="#" class="btn btn-ghost">Fuzz fixtures</a>
@@ -772,13 +815,6 @@
           <svg class="chev w-5 h-5 text-fog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
         </summary>
         <p class="mt-3 text-sm text-fog">Yes — the instruction format is identical. Use the same <span class="mono text-chalk">spl_token::instruction::*</span> builders you already use. CPI through p-token is also cheaper, so your callers see savings too.</p>
-      </details>
-      <details class="card p-5">
-        <summary class="flex items-center justify-between gap-3">
-          <span class="font-extrabold">Where does the name "Pinocchio" come from?</span>
-          <svg class="chev w-5 h-5 text-fog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
-        </summary>
-        <p class="mt-3 text-sm text-fog">Pinocchio is the upstream framework — a minimal, no_std alternative to <span class="mono text-chalk">solana-program</span>. The name nods to "carving a real program from raw wood": you write against the syscalls directly, with no generic SDK in between.</p>
       </details>
     </div>
   </div>
@@ -914,6 +950,28 @@
   const seenSigs = new Set();
   const pureTokenSamples = []; // CU values from txs that ONLY call SPL Token
 
+  // Telemetry
+  let lastLatencyMs = 0;
+
+  // Instruction breakdown — only count names that match SPL Token's instruction set
+  const SPL_TOKEN_IXS = new Set([
+    'InitializeMint', 'InitializeMint2',
+    'InitializeAccount', 'InitializeAccount2', 'InitializeAccount3',
+    'InitializeMultisig', 'InitializeMultisig2',
+    'InitializeImmutableOwner',
+    'Transfer', 'TransferChecked',
+    'Approve', 'ApproveChecked',
+    'Revoke', 'SetAuthority',
+    'MintTo', 'MintToChecked',
+    'Burn', 'BurnChecked',
+    'CloseAccount', 'FreezeAccount', 'ThawAccount',
+    'SyncNative', 'GetAccountDataSize',
+    'AmountToUiAmount', 'UiAmountToAmount',
+    'Batch', 'WithdrawExcessLamports',
+  ]);
+  const ixCounts = {};
+  let totalIxs = 0;
+
   // Smooth-animation state — displayed values ease toward totals and
   // extrapolate forward at the observed sampling rate.
   let displayedReal = 0;
@@ -932,19 +990,81 @@
   }
 
   async function updateNetwork() {
+    const t0 = performance.now();
     try {
-      const [slot, perf] = await Promise.all([
+      const [slot, perf, epoch, block, prio] = await Promise.all([
         conn.getSlot(),
         conn.getRecentPerformanceSamples(1).catch(() => []),
+        conn.getEpochInfo().catch(() => null),
+        conn.getBlockHeight().catch(() => null),
+        conn.getRecentPrioritizationFees().catch(() => []),
       ]);
+      lastLatencyMs = Math.round(performance.now() - t0);
+
       $('live-slot').textContent = slot.toLocaleString('en-US');
       if (perf && perf[0]) {
         const tps = Math.round(perf[0].numTransactions / perf[0].samplePeriodSecs);
         $('live-tps').textContent = tps.toLocaleString('en-US');
       }
+
+      // Network telemetry panel
+      const rpcEl = $('tel-rpc');
+      if (rpcEl) {
+        try { rpcEl.textContent = new URL(RPCS[rpcIndex]).hostname; } catch (e) {}
+      }
+      const latEl = $('tel-latency');
+      if (latEl) latEl.textContent = lastLatencyMs;
+
+      if (block != null) {
+        const el = $('tel-block');
+        if (el) el.textContent = block.toLocaleString('en-US');
+      }
+
+      if (epoch) {
+        const elEp = $('tel-epoch');
+        if (elEp) elEp.textContent = epoch.epoch.toLocaleString('en-US');
+        const pct = Math.round((epoch.slotIndex / epoch.slotsInEpoch) * 100);
+        const elBar = $('tel-epoch-bar');
+        if (elBar) elBar.style.width = pct + '%';
+        const elPct = $('tel-epoch-pct');
+        if (elPct) elPct.textContent = pct;
+      }
+
+      if (Array.isArray(prio) && prio.length > 0) {
+        const fees = prio.map(p => p.prioritizationFee).filter(n => n != null).sort((a, b) => a - b);
+        if (fees.length > 0) {
+          const p50 = fees[Math.floor(fees.length / 2)];
+          const elPrio = $('tel-prio');
+          if (elPrio) elPrio.textContent = p50.toLocaleString('en-US');
+        }
+      }
     } catch (e) {
       console.warn('updateNetwork failed', e);
       rotateRpc();
+    }
+  }
+
+  function renderInstructionBars() {
+    const container = $('ix-bars');
+    const countEl = $('ix-count');
+    if (!container) return;
+    if (countEl) countEl.textContent = fmtNum(totalIxs);
+
+    const sorted = Object.entries(ixCounts).sort((a, b) => b[1] - a[1]);
+    if (sorted.length === 0) return;
+
+    const max = sorted[0][1];
+    container.innerHTML = '';
+    for (const [name, count] of sorted.slice(0, 8)) {
+      const pct = totalIxs > 0 ? Math.round((count / totalIxs) * 100) : 0;
+      const widthPct = max > 0 ? Math.round((count / max) * 100) : 0;
+      const row = document.createElement('div');
+      row.className = 'grid grid-cols-[7rem_1fr_5rem] items-center gap-3 text-sm';
+      row.innerHTML =
+        '<div class="mono text-chalk text-xs truncate">' + name + '</div>' +
+        '<div class="h-2 rounded-full bg-line overflow-hidden"><div class="h-full bg-amber-400 transition-all duration-500" style="width: ' + widthPct + '%"></div></div>' +
+        '<div class="mono text-amber-400 text-xs text-right">' + count + ' · ' + pct + '%</div>';
+      container.appendChild(row);
     }
   }
 
@@ -1022,6 +1142,8 @@
     }
 
     if (batchSaved > 0) flashSaved(batchSaved);
+
+    renderInstructionBars();
   }
 
   function tickAnimation() {
@@ -1074,14 +1196,20 @@
         totalSaved += (cu - pino);
         batchSaved += (cu - pino);
 
-        // Determine if this tx is "pure" SPL Token (no other top-level programs)
-        // by scanning the log preamble for "Program X invoke [1]" entries.
+        // Walk the logs once:
+        //   1. detect top-level program invocations (for "pure" SPL Token classification)
+        //   2. count individual SPL Token instructions (for the breakdown panel)
         let pureToken = false;
         const logs = tx.meta.logMessages || [];
         const topLevel = new Set();
         for (const log of logs) {
-          const m = log.match(/^Program (\S+) invoke \[1\]/);
-          if (m) topLevel.add(m[1]);
+          const inv = log.match(/^Program (\S+) invoke \[1\]/);
+          if (inv) topLevel.add(inv[1]);
+          const ix = log.match(/^Program log: Instruction: (\w+)/);
+          if (ix && SPL_TOKEN_IXS.has(ix[1])) {
+            ixCounts[ix[1]] = (ixCounts[ix[1]] || 0) + 1;
+            totalIxs++;
+          }
         }
         if (topLevel.size === 1 && topLevel.has(TOKEN_PROGRAM_STR)) {
           pureToken = true;
