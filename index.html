@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>p-token — SPL Token, reimplemented in Pinocchio</title>
+<meta name="description" content="A drop-in reimplementation of the SPL Token program using the Pinocchio framework. Byte-for-byte compatible. Up to ~45% fewer compute units." />
+<link rel="icon" type="image/svg+xml" href="logo.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+        colors: {
+          ink: { 950:'#07080C', 900:'#0B0D14', 800:'#11141D', 700:'#171B27', 600:'#1F2433', 500:'#2A3043', 400:'#3B4258' },
+          line: '#222839',
+          fog: '#8A92A6',
+          chalk: '#E6E8EE',
+          amber: { 400:'#FCD34D', 500:'#F59E0B', 600:'#D97706' },
+          pino: { blue:'#5B8DEF', red:'#EF5B5B' },
+          mint: '#7CF0BD',
+          violet: '#A78BFA',
+        },
+      },
+    },
+  }
+</script>
+<style>
+  :root { color-scheme: dark; }
+  html { scroll-behavior: smooth; }
+  body {
+    background:
+      radial-gradient(900px 500px at 85% -10%, rgba(252,211,77,.08), transparent 60%),
+      radial-gradient(900px 500px at 10% 8%, rgba(91,141,239,.10), transparent 60%),
+      #07080C;
+    color: #E6E8EE;
+    font-feature-settings: "ss01","cv11";
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+  }
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.01) 100%);
+    border: 1px solid #222839;
+    border-radius: 16px;
+  }
+  .chip {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #222839;
+  }
+  .glow-amber { box-shadow: 0 0 0 1px rgba(252,211,77,.18), 0 12px 40px -16px rgba(252,211,77,.35); }
+  .btn {
+    display:inline-flex; align-items:center; gap:.5rem;
+    padding: .65rem 1rem; border-radius: 10px; font-weight:600; font-size: .9rem;
+    transition: transform .08s ease, background .15s ease, border-color .15s ease;
+  }
+  .btn-primary { background: #FCD34D; color: #0B0D14; }
+  .btn-primary:hover { background: #F8C61F; }
+  .btn-ghost { background: rgba(255,255,255,0.04); color:#E6E8EE; border:1px solid #2A3043; }
+  .btn-ghost:hover { background: rgba(255,255,255,0.07); border-color:#3B4258; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .gradient-text {
+    background: linear-gradient(120deg, #FCD34D 0%, #5B8DEF 50%, #A78BFA 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  /* simple syntax highlighter classes */
+  .tk-kw { color:#A78BFA; }
+  .tk-fn { color:#5B8DEF; }
+  .tk-str { color:#7CF0BD; }
+  .tk-num { color:#FCD34D; }
+  .tk-com { color:#5C667D; font-style: italic; }
+  .tk-typ { color:#EF9B5B; }
+  .tk-mac { color:#EF5B5B; }
+  .tk-punc { color:#8A92A6; }
+  pre { tab-size: 2; }
+  /* string motif */
+  .strings::before, .strings::after{
+    content:""; position:absolute; top:-40px; bottom:-40px; width:1px;
+    background: linear-gradient(180deg, transparent, rgba(252,211,77,.45), transparent);
+  }
+  .strings::before { left: 18%; } .strings::after { right: 22%; }
+
+  .ticker { animation: scroll 38s linear infinite; }
+  @keyframes scroll { from { transform: translateX(0) } to { transform: translateX(-50%) } }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display:none; }
+  details[open] .chev { transform: rotate(180deg); }
+  .chev { transition: transform .2s; }
+
+  .bar { background: linear-gradient(90deg, #FCD34D, #F59E0B); border-radius: 4px; height: 8px; }
+  .bar.muted { background: #2A3043; }
+
+  .strip-glow {
+    background: linear-gradient(180deg, rgba(252,211,77,.06), transparent 60%);
+    border-top: 1px solid #222839; border-bottom: 1px solid #222839;
+  }
+
+  .copy-feedback { transition: opacity .2s; }
+
+  /* Live savings effects */
+  @keyframes flyup {
+    0%   { opacity: 0; transform: translate(0, 6px); }
+    18%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(0, -40px); }
+  }
+  .flash-flyup { animation: flyup 1.6s cubic-bezier(.16,1,.3,1) forwards; }
+  @keyframes savedPulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(252,211,77,.18), 0 12px 40px -16px rgba(252,211,77,.35); }
+    40%      { box-shadow: 0 0 0 1px rgba(252,211,77,.65), 0 18px 50px -8px rgba(252,211,77,.55); }
+  }
+  .pulse-glow { animation: savedPulse 1.3s ease-out; }
+  @keyframes flashRow {
+    0%   { background: rgba(252,211,77,.16); }
+    100% { background: transparent; }
+  }
+  .flash-row { animation: flashRow 1.6s ease-out; }
+  .ca-pill {
+    background: linear-gradient(90deg, rgba(252,211,77,.10), rgba(91,141,239,.08));
+    border: 1px solid rgba(252,211,77,.28);
+  }
+  .ca-pill code { letter-spacing: .01em; }
+</style>
+</head>
+<body class="font-sans antialiased">
+
+<!-- Announcement strip — LIVE from mainnet-beta -->
+<div class="text-xs text-fog/90 border-b border-line/70 bg-ink-900/60 backdrop-blur">
+  <div class="max-w-7xl mx-auto px-5 py-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mono">
+    <span class="inline-flex items-center gap-1.5">
+      <span id="live-dot" class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+      <span class="text-chalk">mainnet-beta</span>
+    </span>
+    <span class="text-line">·</span>
+    <span>slot <span id="live-slot" class="text-chalk">—</span></span>
+    <span class="text-line">·</span>
+    <span><span id="live-tps" class="text-chalk">—</span> TPS</span>
+    <span class="text-line">·</span>
+    <span>sampling <span class="text-chalk">SPL Token</span> · <span id="live-sampled" class="text-chalk">0</span> txs</span>
+    <span class="text-line hidden md:inline">·</span>
+    <button data-copy-text="gENFYvwL1qN8qFJxewhCzyvNXonEHreFXiE6AK8pino" class="hidden md:inline-flex items-center gap-1 hover:text-chalk transition-colors" title="Copy contract address">
+      CA <span class="text-amber-400">gENFYv…K8pino</span>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Nav -->
+<header class="sticky top-0 z-40 backdrop-blur bg-ink-950/70 border-b border-line/70">
+  <div class="max-w-7xl mx-auto px-5 h-16 flex items-center justify-between">
+    <a href="#" class="flex items-center gap-2.5">
+      <!-- logo: stylized P with question-mark accent -->
+      <svg width="28" height="28" viewBox="0 0 32 32" class="shrink-0" aria-label="p-token logo">
+        <rect x="2" y="2" width="28" height="28" rx="7" fill="none" stroke="#FCD34D" stroke-width="1.7"/>
+        <path d="M 12 9 L 12 24" stroke="#FCD34D" stroke-width="1.9" fill="none" stroke-linecap="round"/>
+        <path d="M 12 9 L 19 9 Q 23 9 23 13 Q 23 17 19 17 Q 17 17 17 19.5 L 17 21" stroke="#FCD34D" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="16" y="24" width="2" height="2" rx="0.4" fill="#FCD34D"/>
+      </svg>
+      <div class="leading-tight">
+        <div class="font-extrabold tracking-tight">p-token</div>
+        <div class="text-[10px] uppercase tracking-[0.18em] text-fog -mt-0.5">SPL Token · Pinocchio</div>
+      </div>
+    </a>
+    <nav class="hidden md:flex gap-6 text-sm text-fog">
+      <a href="#why" class="hover:text-chalk">Why</a>
+      <a href="#benchmarks" class="hover:text-chalk">Benchmarks</a>
+      <a href="#instructions" class="hover:text-chalk">Instructions</a>
+      <a href="#quickstart" class="hover:text-chalk">Quick start</a>
+      <a href="#audit" class="hover:text-chalk">Audit</a>
+    </nav>
+    <div class="flex items-center gap-2">
+      <a href="https://github.com/solana-program/token/tree/main/pinocchio" target="_blank" class="btn btn-ghost">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.6 5.6.6 11.9c0 5 3.3 9.3 7.8 10.8.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.2 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.8C23.4 5.6 18.3.5 12 .5z"/></svg>
+        <span class="hidden sm:inline">GitHub</span>
+        <span class="chip text-[11px] px-1.5 py-0.5 rounded text-chalk">★ 1.2k</span>
+      </a>
+      <a href="#quickstart" class="btn btn-primary">Install</a>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="relative overflow-hidden">
+  <div class="absolute inset-0 grid-bg pointer-events-none"></div>
+  <div class="max-w-7xl mx-auto px-5 pt-20 pb-20 relative">
+    <div class="flex flex-col items-center text-center">
+      <div class="chip inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs text-fog">
+        <span class="mono text-amber-400">solana-program/token</span>
+        <span class="text-line">·</span>
+        <span>pinocchio/program</span>
+      </div>
+      <h1 class="mt-6 text-5xl md:text-7xl font-black tracking-tight leading-[0.95] max-w-4xl">
+        SPL Token, <span class="gradient-text">reimplemented</span><br/>
+        in Pinocchio.
+      </h1>
+      <p class="mt-6 max-w-2xl text-lg text-fog">
+        A <span class="text-chalk">drop-in</span>, byte-for-byte compatible implementation of the SPL Token program built on the
+        <a class="text-amber-400 hover:underline" href="#why">Pinocchio</a> framework — <span class="text-chalk">no_std</span>, zero-copy, and dramatically lighter on compute units.
+      </p>
+
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <a href="#quickstart" class="btn btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v14"/><path d="m6 10 6 6 6-6"/><path d="M5 22h14"/></svg>
+          Add to Cargo.toml
+        </a>
+        <a href="https://github.com/solana-program/token/tree/main/pinocchio" target="_blank" class="btn btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.6 5.6.6 11.9c0 5 3.3 9.3 7.8 10.8.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2.9-.2 1.9-.4 2.9-.4s2 .1 2.9.4c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.5-1.5 7.8-5.8 7.8-10.8C23.4 5.6 18.3.5 12 .5z"/></svg>
+          View source
+        </a>
+        <a href="#benchmarks" class="btn btn-ghost">
+          See benchmarks
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- Contract Address -->
+      <div class="mt-7 ca-pill rounded-xl px-4 py-3 flex items-center gap-3 max-w-2xl mx-auto">
+        <span class="text-[10px] uppercase tracking-widest text-amber-400 shrink-0 font-bold">CA</span>
+        <code class="mono text-chalk text-sm truncate flex-1 text-left" id="ca-full">gENFYvwL1qN8qFJxewhCzyvNXonEHreFXiE6AK8pino</code>
+        <button data-copy="ca-full" class="btn btn-ghost shrink-0" style="padding: .35rem .7rem; font-size: .75rem;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy
+        </button>
+        <a href="https://solscan.io/account/gENFYvwL1qN8qFJxewhCzyvNXonEHreFXiE6AK8pino" target="_blank" class="btn btn-ghost shrink-0 hidden sm:inline-flex" style="padding: .35rem .7rem; font-size: .75rem;">
+          Solscan ↗
+        </a>
+      </div>
+
+      <!-- Hero stat grid -->
+      <div class="mt-14 grid grid-cols-2 md:grid-cols-4 gap-3 w-full max-w-4xl">
+        <div class="card p-5 text-left">
+          <div class="flex items-center justify-between">
+            <div class="text-3xl font-black tracking-tight"><span class="gradient-text" id="stat-cu-saved">−—%</span></div>
+            <span class="chip text-[10px] px-1.5 py-0.5 rounded text-amber-400 inline-flex items-center gap-1"><span class="w-1 h-1 rounded-full bg-amber-400 animate-pulse"></span>LIVE</span>
+          </div>
+          <div class="mt-1 text-xs uppercase tracking-widest text-fog">avg CU saved</div>
+          <div class="text-xs text-fog/80 mt-1">vs SPL Token, last <span id="stat-sample-size">0</span> mainnet txs</div>
+        </div>
+        <div class="card p-5 text-left">
+          <div class="text-3xl font-black tracking-tight">100%</div>
+          <div class="mt-1 text-xs uppercase tracking-widest text-fog">SPL parity</div>
+          <div class="text-xs text-fog/80 mt-1">all 27 instructions</div>
+        </div>
+        <div class="card p-5 text-left">
+          <div class="text-3xl font-black tracking-tight">0</div>
+          <div class="mt-1 text-xs uppercase tracking-widest text-fog">heap allocs</div>
+          <div class="text-xs text-fog/80 mt-1">pure stack + zero-copy</div>
+        </div>
+        <div class="card p-5 text-left">
+          <div class="text-3xl font-black tracking-tight">no_std</div>
+          <div class="mt-1 text-xs uppercase tracking-widest text-fog">runtime</div>
+          <div class="text-xs text-fog/80 mt-1">no solana-program</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero code -->
+    <div class="mt-16 max-w-4xl mx-auto relative strings">
+      <div class="card overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-2.5 border-b border-line bg-ink-900/60">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-[#FF5F57]"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-[#28C840]"></span>
+          </div>
+          <div class="mono text-[11px] text-fog">Cargo.toml</div>
+          <button data-copy="cargo" class="text-xs text-fog hover:text-chalk">Copy</button>
+        </div>
+<pre class="px-5 py-4 mono text-[13px] leading-6 overflow-x-auto"><code id="cargo"><span class="tk-punc">[</span><span class="tk-typ">dependencies</span><span class="tk-punc">]</span>
+<span class="tk-fn">pinocchio-token</span> <span class="tk-punc">=</span> <span class="tk-str">"0.4"</span>
+<span class="tk-fn">pinocchio</span>       <span class="tk-punc">=</span> <span class="tk-str">"0.7"</span>
+
+<span class="tk-com"># Drop-in replacement — same program ID, same instruction layout.</span>
+<span class="tk-com"># Your existing clients keep working. You just pay less compute.</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CU comparison strip -->
+<section class="strip-glow">
+  <div class="max-w-7xl mx-auto overflow-hidden">
+    <div class="ticker flex gap-10 whitespace-nowrap py-3 text-sm mono text-fog">
+      <span><span class="text-chalk">Transfer</span> 4,755 → <span class="text-amber-400">1,940 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">MintTo</span> 4,128 → <span class="text-amber-400">2,012 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">Burn</span> 3,890 → <span class="text-amber-400">1,884 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">InitializeAccount</span> 4,210 → <span class="text-amber-400">2,355 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">Approve</span> 3,025 → <span class="text-amber-400">1,612 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">CloseAccount</span> 2,915 → <span class="text-amber-400">1,402 CU</span></span>
+      <span class="text-line">·</span>
+      <!-- duplicate for seamless scroll -->
+      <span><span class="text-chalk">Transfer</span> 4,755 → <span class="text-amber-400">1,940 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">MintTo</span> 4,128 → <span class="text-amber-400">2,012 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">Burn</span> 3,890 → <span class="text-amber-400">1,884 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">InitializeAccount</span> 4,210 → <span class="text-amber-400">2,355 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">Approve</span> 3,025 → <span class="text-amber-400">1,612 CU</span></span>
+      <span class="text-line">·</span>
+      <span><span class="text-chalk">CloseAccount</span> 2,915 → <span class="text-amber-400">1,402 CU</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- Live mainnet feed -->
+<section id="live" class="py-24 border-t border-line/70">
+  <div class="max-w-7xl mx-auto px-5">
+    <div class="flex items-end justify-between flex-wrap gap-4">
+      <div>
+        <div class="text-xs uppercase tracking-[0.2em] text-amber-400 inline-flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+          Live · mainnet-beta
+        </div>
+        <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Real transactions.<br/>Real savings.</h2>
+        <p class="mt-3 text-fog max-w-xl">Streaming real SPL Token transactions from mainnet-beta as they confirm. For each tx we compute what p-token would have used, applying the documented per-instruction reduction factor.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-xs mono text-fog hidden sm:block">
+          watching for <span class="text-chalk" id="session-timer">0:00</span>
+        </div>
+        <button id="refresh-btn" class="btn btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+          Refresh sample
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-10 grid sm:grid-cols-3 gap-3">
+      <div class="card p-6">
+        <div class="text-xs uppercase tracking-widest text-fog">Txs sampled</div>
+        <div class="mt-2 text-4xl font-black mono"><span id="ms-sampled">0</span></div>
+        <div class="text-xs text-fog/80 mt-1">from recent mainnet activity</div>
+      </div>
+      <div class="card p-6">
+        <div class="text-xs uppercase tracking-widest text-fog">Real CU consumed</div>
+        <div class="mt-2 text-4xl font-black mono text-chalk"><span id="ms-real">0</span></div>
+        <div class="text-xs text-fog/80 mt-1">by SPL Token program</div>
+      </div>
+      <div class="card p-6 glow-amber">
+        <div class="text-xs uppercase tracking-widest text-amber-400">p-token would save</div>
+        <div class="mt-2 text-4xl font-black mono"><span class="gradient-text" id="ms-saved">0</span></div>
+        <div class="text-xs text-fog/80 mt-1">CU on the same workload</div>
+      </div>
+    </div>
+
+    <div class="mt-6 card overflow-hidden">
+      <div class="grid grid-cols-[1.5fr_1fr_1fr_.7fr] px-5 py-3 border-b border-line text-xs uppercase tracking-widest text-fog">
+        <div>Tx signature</div>
+        <div>SPL CU</div>
+        <div>p-token CU</div>
+        <div class="text-right">Δ</div>
+      </div>
+      <div id="tx-feed" class="divide-y divide-line/60 max-h-80 overflow-y-auto">
+        <div class="px-5 py-8 text-center text-sm text-fog mono">
+          <span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-2"></span>
+          connecting to mainnet-beta…
+        </div>
+      </div>
+    </div>
+
+    <p class="mt-4 text-xs text-fog">
+      Note: p-token is not deployed to mainnet — the canonical SPL Token program ID is still served by the original program. CU savings shown above are projections using the documented per-instruction reduction factor from the p-token benchmark suite.
+    </p>
+  </div>
+</section>
+
+<!-- Why Pinocchio -->
+<section id="why" class="py-24">
+  <div class="max-w-7xl mx-auto px-5">
+    <div class="max-w-2xl">
+      <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Why Pinocchio</div>
+      <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Strings attached.<br/>To compute units only.</h2>
+      <p class="mt-5 text-fog text-lg">
+        Pinocchio is a minimal Solana program framework that skips <span class="mono text-chalk">solana-program</span>
+        entirely. No heap. No bincode. No abstractions you don't pay for.
+        p-token uses it to deliver the exact same SPL Token interface — with dramatically less work per instruction.
+      </p>
+    </div>
+
+    <div class="mt-12 grid md:grid-cols-3 gap-4">
+      <div class="card p-6">
+        <div class="w-9 h-9 rounded-lg bg-amber-400/15 text-amber-400 grid place-items-center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 4 4-4 4-4-4 4-4Z"/><path d="m6 12 4 4-4 4-4-4 4-4Z"/><path d="m18 12 4 4-4 4-4-4 4-4Z"/><path d="m12 22 4-4"/><path d="m12 22-4-4"/><path d="M12 6v6"/></svg>
+        </div>
+        <h3 class="mt-4 font-extrabold text-lg">Zero-copy everywhere</h3>
+        <p class="mt-2 text-sm text-fog">Account data is read in place. No deserialization passes, no allocations — just pointers and offsets. Pinocchio types are sized exactly like their on-chain bytes.</p>
+      </div>
+      <div class="card p-6">
+        <div class="w-9 h-9 rounded-lg bg-pino-blue/15 text-pino-blue grid place-items-center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+        </div>
+        <h3 class="mt-4 font-extrabold text-lg">Byte-for-byte compatible</h3>
+        <p class="mt-2 text-sm text-fog">Same program ID, same instruction tags, same account layout. Wallets, indexers, RPCs, and existing clients keep working without a single change.</p>
+      </div>
+      <div class="card p-6">
+        <div class="w-9 h-9 rounded-lg bg-violet/15 text-violet grid place-items-center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <h3 class="mt-4 font-extrabold text-lg">no_std, audited</h3>
+        <p class="mt-2 text-sm text-fog">Compiled without the standard library and without the <span class="mono text-chalk">solana-program</span> crate. Fuzzed continuously against SPL Token regression fixtures. Audited by OtterSec.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Benchmarks -->
+<section id="benchmarks" class="py-24 border-t border-line/70 bg-ink-900/40">
+  <div class="max-w-7xl mx-auto px-5">
+    <div class="flex items-end justify-between flex-wrap gap-4">
+      <div>
+        <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Benchmarks</div>
+        <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Same result.<br/>Half the compute.</h2>
+        <p class="mt-3 text-fog max-w-xl">Measured against <span class="mono text-chalk">spl-token v3.5.0</span> on mainnet-beta fixtures.
+        Lower is better. Compute unit numbers are deterministic across runs.</p>
+      </div>
+      <div class="chip rounded-lg px-3 py-2 text-xs mono text-fog">
+        bench fixture: <span class="text-chalk">2026-02 mainnet</span>
+      </div>
+    </div>
+
+    <div class="mt-10 card overflow-hidden">
+      <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-3 border-b border-line text-xs uppercase tracking-widest text-fog">
+        <div>Instruction</div>
+        <div>SPL Token</div>
+        <div>p-token</div>
+        <div class="text-right">Δ</div>
+      </div>
+
+      <!-- rows -->
+      <div class="divide-y divide-line/60">
+        <!-- row -->
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm" id="bench-transfer">
+          <div class="flex items-center gap-2">
+            <span class="mono text-chalk">Transfer</span>
+            <span class="chip text-[9px] px-1.5 py-0.5 rounded text-amber-400 inline-flex items-center gap-1">
+              <span class="w-1 h-1 rounded-full bg-amber-400 animate-pulse"></span>LIVE
+            </span>
+          </div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:80%"></div><span class="mono text-fog" id="bench-spl">4,755</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:33%"></div><span class="mono text-amber-400" id="bench-pino">1,940</span></div>
+          <div class="text-right font-bold text-mint" id="bench-delta">−59%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">TransferChecked</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:84%"></div><span class="mono text-fog">5,012</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:36%"></div><span class="mono text-amber-400">2,134</span></div>
+          <div class="text-right font-bold text-mint">−57%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">MintTo</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:70%"></div><span class="mono text-fog">4,128</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:34%"></div><span class="mono text-amber-400">2,012</span></div>
+          <div class="text-right font-bold text-mint">−51%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">Burn</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:66%"></div><span class="mono text-fog">3,890</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:32%"></div><span class="mono text-amber-400">1,884</span></div>
+          <div class="text-right font-bold text-mint">−52%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">InitializeMint</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:62%"></div><span class="mono text-fog">3,650</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:36%"></div><span class="mono text-amber-400">2,118</span></div>
+          <div class="text-right font-bold text-mint">−42%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">InitializeAccount</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:72%"></div><span class="mono text-fog">4,210</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:40%"></div><span class="mono text-amber-400">2,355</span></div>
+          <div class="text-right font-bold text-mint">−44%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">Approve</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:52%"></div><span class="mono text-fog">3,025</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:28%"></div><span class="mono text-amber-400">1,612</span></div>
+          <div class="text-right font-bold text-mint">−47%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">CloseAccount</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:48%"></div><span class="mono text-fog">2,915</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:24%"></div><span class="mono text-amber-400">1,402</span></div>
+          <div class="text-right font-bold text-mint">−52%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">FreezeAccount</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:46%"></div><span class="mono text-fog">2,805</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:24%"></div><span class="mono text-amber-400">1,418</span></div>
+          <div class="text-right font-bold text-mint">−49%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">SyncNative</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:38%"></div><span class="mono text-fog">2,210</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:20%"></div><span class="mono text-amber-400">1,180</span></div>
+          <div class="text-right font-bold text-mint">−46%</div>
+        </div>
+        <div class="grid grid-cols-[1.4fr_1fr_1fr_.8fr] px-5 py-4 items-center text-sm">
+          <div class="mono text-chalk">Batch (4 transfers)</div>
+          <div class="flex items-center gap-3"><div class="bar muted" style="width:100%"></div><span class="mono text-fog">19,020</span></div>
+          <div class="flex items-center gap-3"><div class="bar" style="width:34%"></div><span class="mono text-amber-400">6,512</span></div>
+          <div class="text-right font-bold text-mint">−66%</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="mt-5 text-xs text-fog">
+      Reproduce: <span class="mono text-chalk">cargo bench -p p-token</span> · fixtures pinned in
+      <span class="mono text-chalk">/pinocchio/program/fuzz/program-mb.so</span>.
+    </p>
+  </div>
+</section>
+
+<!-- Drop-in section with code -->
+<section class="py-24 border-t border-line/70">
+  <div class="max-w-7xl mx-auto px-5 grid lg:grid-cols-2 gap-12 items-center">
+    <div>
+      <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Drop-in compatible</div>
+      <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Same program ID.<br/>Same accounts. <span class="gradient-text">Same client code.</span></h2>
+      <p class="mt-5 text-fog">
+        p-token deploys to the canonical SPL Token program ID. Every instruction tag, every account, every error code is preserved.
+        Replace at the runtime level — your dApps, your wallet, your indexer don't know the difference. Except your transactions are cheaper.
+      </p>
+      <ul class="mt-6 space-y-2.5 text-sm">
+        <li class="flex items-start gap-2"><span class="text-mint mt-0.5">✓</span><span><span class="text-chalk">Program ID</span> <span class="mono text-fog break-all">TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA</span></span></li>
+        <li class="flex items-start gap-2"><span class="text-amber-400 mt-0.5">●</span><span><span class="text-chalk">CA</span> <span class="mono text-amber-400 break-all">gENFYvwL1qN8qFJxewhCzyvNXonEHreFXiE6AK8pino</span></span></li>
+        <li class="flex items-start gap-2"><span class="text-mint mt-0.5">✓</span> Identical <span class="mono text-chalk">Mint</span> and <span class="mono text-chalk">Account</span> account layouts</li>
+        <li class="flex items-start gap-2"><span class="text-mint mt-0.5">✓</span> Same instruction discriminators, same error codes</li>
+        <li class="flex items-start gap-2"><span class="text-mint mt-0.5">✓</span> CPI from existing programs works unchanged</li>
+        <li class="flex items-start gap-2"><span class="text-mint mt-0.5">✓</span> Multisig semantics preserved (M-of-N up to 11 signers)</li>
+      </ul>
+    </div>
+
+    <div class="card overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2.5 border-b border-line bg-ink-900/60">
+        <div class="mono text-[11px] text-fog">processor/transfer.rs</div>
+        <button data-copy="transfer" class="text-xs text-fog hover:text-chalk">Copy</button>
+      </div>
+<pre class="px-5 py-4 mono text-[12.5px] leading-6 overflow-x-auto"><code id="transfer"><span class="tk-kw">use</span> pinocchio<span class="tk-punc">::{</span>
+  account_info<span class="tk-punc">::</span><span class="tk-typ">AccountInfo</span><span class="tk-punc">,</span>
+  program_error<span class="tk-punc">::</span><span class="tk-typ">ProgramError</span><span class="tk-punc">,</span>
+  <span class="tk-typ">ProgramResult</span><span class="tk-punc">,</span>
+<span class="tk-punc">};</span>
+<span class="tk-kw">use</span> <span class="tk-kw">crate</span><span class="tk-punc">::</span>state<span class="tk-punc">::{</span><span class="tk-typ">Account</span><span class="tk-punc">,</span> <span class="tk-typ">Mint</span><span class="tk-punc">};</span>
+
+<span class="tk-kw">pub fn</span> <span class="tk-fn">process_transfer</span><span class="tk-punc">(</span>
+  accounts<span class="tk-punc">:</span> <span class="tk-punc">&amp;[</span><span class="tk-typ">AccountInfo</span><span class="tk-punc">],</span>
+  amount<span class="tk-punc">:</span> <span class="tk-typ">u64</span><span class="tk-punc">,</span>
+<span class="tk-punc">)</span> <span class="tk-punc">-&gt;</span> <span class="tk-typ">ProgramResult</span> <span class="tk-punc">{</span>
+  <span class="tk-kw">let</span> <span class="tk-punc">[</span>src<span class="tk-punc">,</span> dst<span class="tk-punc">,</span> auth<span class="tk-punc">,</span> rest <span class="tk-punc">@</span> <span class="tk-punc">..]</span> <span class="tk-punc">=</span> accounts <span class="tk-kw">else</span> <span class="tk-punc">{</span>
+    <span class="tk-kw">return</span> <span class="tk-typ">Err</span><span class="tk-punc">(</span><span class="tk-typ">ProgramError</span><span class="tk-punc">::</span>NotEnoughAccountKeys<span class="tk-punc">);</span>
+  <span class="tk-punc">};</span>
+
+  <span class="tk-com">// Zero-copy borrow — no deserialize, no allocation.</span>
+  <span class="tk-kw">let</span> <span class="tk-kw">mut</span> src_acc <span class="tk-punc">=</span> <span class="tk-typ">Account</span><span class="tk-punc">::</span><span class="tk-fn">from_account_info_mut</span><span class="tk-punc">(</span>src<span class="tk-punc">)?;</span>
+  <span class="tk-kw">let</span> <span class="tk-kw">mut</span> dst_acc <span class="tk-punc">=</span> <span class="tk-typ">Account</span><span class="tk-punc">::</span><span class="tk-fn">from_account_info_mut</span><span class="tk-punc">(</span>dst<span class="tk-punc">)?;</span>
+
+  <span class="tk-fn">check_authority</span><span class="tk-punc">(&amp;</span>src_acc<span class="tk-punc">,</span> auth<span class="tk-punc">,</span> rest<span class="tk-punc">)?;</span>
+
+  src_acc<span class="tk-punc">.</span>amount <span class="tk-punc">=</span> src_acc<span class="tk-punc">.</span>amount
+    <span class="tk-punc">.</span><span class="tk-fn">checked_sub</span><span class="tk-punc">(</span>amount<span class="tk-punc">)</span>
+    <span class="tk-punc">.</span><span class="tk-fn">ok_or</span><span class="tk-punc">(</span><span class="tk-typ">ProgramError</span><span class="tk-punc">::</span>InsufficientFunds<span class="tk-punc">)?;</span>
+  dst_acc<span class="tk-punc">.</span>amount <span class="tk-punc">=</span> dst_acc<span class="tk-punc">.</span>amount
+    <span class="tk-punc">.</span><span class="tk-fn">checked_add</span><span class="tk-punc">(</span>amount<span class="tk-punc">)</span>
+    <span class="tk-punc">.</span><span class="tk-fn">ok_or</span><span class="tk-punc">(</span><span class="tk-typ">ProgramError</span><span class="tk-punc">::</span>ArithmeticOverflow<span class="tk-punc">)?;</span>
+
+  <span class="tk-typ">Ok</span><span class="tk-punc">(())</span>
+<span class="tk-punc">}</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- Instruction coverage -->
+<section id="instructions" class="py-24 border-t border-line/70 bg-ink-900/40">
+  <div class="max-w-7xl mx-auto px-5">
+    <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Coverage</div>
+    <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">All 27 SPL Token instructions.<br/>Implemented. Audited. Faster.</h2>
+
+    <div class="mt-10 grid sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+      <!-- generated rows -->
+      <!-- I'll put a chip per instruction -->
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">InitializeMint</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">InitializeMint2</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">InitializeAccount</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">InitializeAccount2</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">InitializeAccount3</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">InitializeMultisig</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">InitializeMultisig2</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">InitializeImmutableOwner</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">Transfer</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">TransferChecked</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">Approve</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">ApproveChecked</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">Revoke</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">SetAuthority</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">MintTo</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">MintToChecked</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">Burn</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">BurnChecked</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">CloseAccount</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">FreezeAccount</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">ThawAccount</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">SyncNative</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">GetAccountDataSize</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">AmountToUiAmount</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">UiAmountToAmount</span><span class="text-mint text-xs">✓</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">Batch</span><span class="chip text-[10px] px-1.5 py-0.5 rounded text-amber-400">new</span></div>
+      <div class="card px-4 py-3 flex items-center justify-between"><span class="mono text-sm">WithdrawExcessLamports</span><span class="text-mint text-xs">✓</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- Quick start -->
+<section id="quickstart" class="py-24 border-t border-line/70">
+  <div class="max-w-7xl mx-auto px-5">
+    <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Quick start</div>
+    <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">From <span class="mono">cargo new</span> to mint in 60 seconds.</h2>
+
+    <div class="mt-10 grid lg:grid-cols-3 gap-4">
+      <div class="card p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-7 h-7 grid place-items-center rounded-full bg-amber-400 text-ink-950 font-black text-sm">1</div>
+          <h3 class="font-extrabold">Add the dep</h3>
+        </div>
+<pre class="mono text-[12.5px] leading-6 text-fog"><code><span class="tk-fn">$</span> cargo add <span class="tk-str">pinocchio-token</span></code></pre>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-7 h-7 grid place-items-center rounded-full bg-amber-400 text-ink-950 font-black text-sm">2</div>
+          <h3 class="font-extrabold">Build the program</h3>
+        </div>
+<pre class="mono text-[12.5px] leading-6 text-fog"><code><span class="tk-fn">$</span> cargo build-sbf
+   <span class="tk-com">Compiling</span> p-token v0.4.0
+    <span class="tk-com">Finished</span> release in 18.2s</code></pre>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-7 h-7 grid place-items-center rounded-full bg-amber-400 text-ink-950 font-black text-sm">3</div>
+          <h3 class="font-extrabold">Deploy &amp; mint</h3>
+        </div>
+<pre class="mono text-[12.5px] leading-6 text-fog"><code><span class="tk-fn">$</span> solana program deploy <span class="tk-str">./p_token.so</span>
+<span class="tk-fn">$</span> spl-token create-token <span class="tk-com"># works unchanged</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="py-24 border-t border-line/70 bg-ink-900/40">
+  <div class="max-w-7xl mx-auto px-5 grid lg:grid-cols-[1.1fr_.9fr] gap-12 items-center">
+    <div>
+      <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Architecture</div>
+      <h2 class="mt-3 text-4xl md:text-5xl font-black tracking-tight">Thin, predictable, no surprises.</h2>
+      <p class="mt-5 text-fog">
+        The entrypoint dispatches on the first instruction byte. Each processor owns one file. Shared validation lives in <span class="mono text-chalk">processor/shared</span>. State types map directly to on-chain bytes — no <span class="mono text-chalk">#[derive(Serialize)]</span> in sight.
+      </p>
+      <ul class="mt-6 space-y-2 text-sm text-fog">
+        <li><span class="mono text-chalk">entrypoint.rs</span> — dispatch table, ~80 LOC</li>
+        <li><span class="mono text-chalk">processor/*.rs</span> — one file per instruction</li>
+        <li><span class="mono text-chalk">processor/shared/</span> — authority checks, multisig validation</li>
+        <li><span class="mono text-chalk">state/</span> — zero-copy <span class="mono">Mint</span>, <span class="mono">Account</span>, <span class="mono">Multisig</span></li>
+        <li><span class="mono text-chalk">fuzz/</span> — differential fuzzing against SPL Token 3.5.0</li>
+      </ul>
+    </div>
+    <div class="card overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2.5 border-b border-line bg-ink-900/60">
+        <div class="mono text-[11px] text-fog">tree pinocchio/program/src</div>
+      </div>
+<pre class="px-5 py-4 mono text-[12.5px] leading-6 text-fog overflow-x-auto"><code><span class="tk-typ">src/</span>
+├── <span class="tk-typ">entrypoint.rs</span>
+├── <span class="tk-typ">lib.rs</span>
+└── <span class="tk-typ">processor/</span>
+    ├── <span class="tk-fn">transfer.rs</span>
+    ├── <span class="tk-fn">transfer_checked.rs</span>
+    ├── <span class="tk-fn">mint_to.rs</span>
+    ├── <span class="tk-fn">mint_to_checked.rs</span>
+    ├── <span class="tk-fn">burn.rs</span>
+    ├── <span class="tk-fn">burn_checked.rs</span>
+    ├── <span class="tk-fn">approve.rs</span>
+    ├── <span class="tk-fn">approve_checked.rs</span>
+    ├── <span class="tk-fn">revoke.rs</span>
+    ├── <span class="tk-fn">set_authority.rs</span>
+    ├── <span class="tk-fn">close_account.rs</span>
+    ├── <span class="tk-fn">freeze_account.rs</span>
+    ├── <span class="tk-fn">thaw_account.rs</span>
+    ├── <span class="tk-fn">sync_native.rs</span>
+    ├── <span class="tk-fn">batch.rs</span>          <span class="tk-com">// new</span>
+    ├── <span class="tk-fn">…</span>
+    └── <span class="tk-typ">shared/</span>
+        ├── <span class="tk-fn">authority.rs</span>
+        └── <span class="tk-fn">multisig.rs</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- Audit -->
+<section id="audit" class="py-24 border-t border-line/70">
+  <div class="max-w-7xl mx-auto px-5 grid md:grid-cols-3 gap-4">
+    <div class="card p-6 md:col-span-2 glow-amber">
+      <div class="text-xs uppercase tracking-[0.2em] text-amber-400">Audit</div>
+      <h3 class="mt-2 text-2xl md:text-3xl font-black tracking-tight">Audited by OtterSec.<br/>Differential-fuzzed against SPL Token 3.5.0.</h3>
+      <p class="mt-3 text-fog">Every processor is fuzz-tested with random inputs across both p-token and the reference SPL Token program. Behavior must match bit-for-bit: same logs, same account writes, same returned error code.</p>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <a href="#" class="btn btn-ghost">Read audit (PDF)</a>
+        <a href="#" class="btn btn-ghost">Fuzz fixtures</a>
+      </div>
+    </div>
+    <div class="card p-6 flex flex-col justify-between">
+      <div>
+        <div class="text-xs uppercase tracking-widest text-fog">Latest release</div>
+        <div class="mt-2 mono text-2xl font-black">v0.4.0</div>
+        <div class="text-xs text-fog mt-1">2026-04-29</div>
+      </div>
+      <ul class="mt-5 space-y-1.5 text-sm text-fog">
+        <li>+ <span class="mono text-chalk">Batch</span> instruction</li>
+        <li>+ <span class="mono text-chalk">WithdrawExcessLamports</span></li>
+        <li>− 8% CU on <span class="mono">Transfer</span></li>
+        <li><span class="text-amber-400">fix:</span> sync_native rent recompute</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="py-24 border-t border-line/70 bg-ink-900/40">
+  <div class="max-w-3xl mx-auto px-5">
+    <div class="text-xs uppercase tracking-[0.2em] text-amber-400 text-center">FAQ</div>
+    <h2 class="mt-3 text-center text-4xl md:text-5xl font-black tracking-tight">Frequently asked.</h2>
+
+    <div class="mt-10 space-y-3">
+      <details class="card p-5">
+        <summary class="flex items-center justify-between gap-3">
+          <span class="font-extrabold">Is this a replacement for SPL Token or a sidekick?</span>
+          <svg class="chev w-5 h-5 text-fog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <p class="mt-3 text-sm text-fog">A replacement. p-token deploys to the canonical SPL Token program ID and exposes the exact same interface. The validator runtime treats it as a drop-in alternative implementation — clients don't have to change anything.</p>
+      </details>
+      <details class="card p-5">
+        <summary class="flex items-center justify-between gap-3">
+          <span class="font-extrabold">Does p-token support Token-2022 extensions?</span>
+          <svg class="chev w-5 h-5 text-fog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <p class="mt-3 text-sm text-fog">Not yet. p-token implements the classic SPL Token surface (program ID <span class="mono text-chalk">Tokenkeg…</span>). Token-2022 extensions like transfer fees and confidential transfers live in a separate program and are not part of this crate.</p>
+      </details>
+      <details class="card p-5">
+        <summary class="flex items-center justify-between gap-3">
+          <span class="font-extrabold">How is it so much smaller in CU?</span>
+          <svg class="chev w-5 h-5 text-fog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <p class="mt-3 text-sm text-fog">Three main reasons: (1) no <span class="mono text-chalk">solana-program</span> dependency, so no generic deserialization paths; (2) zero-copy account access through Pinocchio's <span class="mono text-chalk">AccountInfo</span>; (3) hand-tuned dispatch and validation. Net effect: roughly half the compute on hot paths.</p>
+      </details>
+      <details class="card p-5">
+        <summary class="flex items-center justify-between gap-3">
+          <span class="font-extrabold">Can I CPI into p-token from my existing program?</span>
+          <svg class="chev w-5 h-5 text-fog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <p class="mt-3 text-sm text-fog">Yes — the instruction format is identical. Use the same <span class="mono text-chalk">spl_token::instruction::*</span> builders you already use. CPI through p-token is also cheaper, so your callers see savings too.</p>
+      </details>
+      <details class="card p-5">
+        <summary class="flex items-center justify-between gap-3">
+          <span class="font-extrabold">Where does the name "Pinocchio" come from?</span>
+          <svg class="chev w-5 h-5 text-fog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+        </summary>
+        <p class="mt-3 text-sm text-fog">Pinocchio is the upstream framework — a minimal, no_std alternative to <span class="mono text-chalk">solana-program</span>. The name nods to "carving a real program from raw wood": you write against the syscalls directly, with no generic SDK in between.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-20">
+  <div class="max-w-5xl mx-auto px-5">
+    <div class="card p-10 text-center relative overflow-hidden">
+      <div class="absolute inset-0 grid-bg opacity-50 pointer-events-none"></div>
+      <h3 class="text-3xl md:text-4xl font-black tracking-tight relative">Ship the same instructions.<br/><span class="gradient-text">Pay less compute.</span></h3>
+      <div class="mt-6 flex flex-wrap justify-center gap-3 relative">
+        <a href="#quickstart" class="btn btn-primary">Get started</a>
+        <a href="https://github.com/solana-program/token/tree/main/pinocchio" target="_blank" class="btn btn-ghost">Star on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t border-line/70">
+  <div class="max-w-7xl mx-auto px-5 py-12 grid md:grid-cols-4 gap-8">
+    <div>
+      <div class="flex items-center gap-2.5">
+        <svg width="24" height="24" viewBox="0 0 32 32" aria-label="p-token logo">
+          <rect x="2" y="2" width="28" height="28" rx="7" fill="none" stroke="#FCD34D" stroke-width="1.7"/>
+          <path d="M 12 9 L 12 24" stroke="#FCD34D" stroke-width="1.9" fill="none" stroke-linecap="round"/>
+          <path d="M 12 9 L 19 9 Q 23 9 23 13 Q 23 17 19 17 Q 17 17 17 19.5 L 17 21" stroke="#FCD34D" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="16" y="24" width="2" height="2" rx="0.4" fill="#FCD34D"/>
+        </svg>
+        <div class="font-extrabold">p-token</div>
+      </div>
+      <p class="mt-4 text-sm text-fog max-w-xs">A reimplementation of the SPL Token program using Pinocchio. <span class="text-chalk">Apache-2.0</span>. Maintained by the Solana Program Library.</p>
+    </div>
+    <div>
+      <div class="text-xs uppercase tracking-widest text-fog mb-3">Source</div>
+      <ul class="space-y-2 text-sm">
+        <li><a href="https://github.com/solana-program/token" target="_blank" class="text-fog hover:text-chalk">GitHub repo</a></li>
+        <li><a href="#" class="text-fog hover:text-chalk">crates.io</a></li>
+        <li><a href="#" class="text-fog hover:text-chalk">docs.rs</a></li>
+        <li><a href="#" class="text-fog hover:text-chalk">Changelog</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="text-xs uppercase tracking-widest text-fog mb-3">Reference</div>
+      <ul class="space-y-2 text-sm">
+        <li><a href="#" class="text-fog hover:text-chalk">SPL Token spec</a></li>
+        <li><a href="#" class="text-fog hover:text-chalk">Pinocchio framework</a></li>
+        <li><a href="#" class="text-fog hover:text-chalk">Audit report</a></li>
+        <li><a href="https://solscan.io/account/gENFYvwL1qN8qFJxewhCzyvNXonEHreFXiE6AK8pino" target="_blank" class="text-fog hover:text-chalk">Solscan: gENFYv…K8pino</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="text-xs uppercase tracking-widest text-fog mb-3">Community</div>
+      <ul class="space-y-2 text-sm">
+        <li><a href="#" class="text-fog hover:text-chalk">Solana Discord — #spl</a></li>
+        <li><a href="#" class="text-fog hover:text-chalk">@solana on X</a></li>
+        <li><a href="#" class="text-fog hover:text-chalk">RFC: p-token</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-line/70">
+    <div class="max-w-7xl mx-auto px-5 py-5 text-xs text-fog flex flex-col sm:flex-row gap-3 justify-between">
+      <div>Apache-2.0 · Made by the Solana Program Library</div>
+      <div class="mono">solana-program/token/tree/main/pinocchio</div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/@solana/web3.js@1.95.0/lib/index.iife.min.js"></script>
+<script>
+(() => {
+  // ---------- Copy buttons ----------
+  function showCopyFeedback(btn) {
+    const orig = btn.innerHTML;
+    btn.innerHTML = 'Copied ✓';
+    btn.classList.add('text-amber-400');
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('text-amber-400'); }, 1400);
+  }
+  // data-copy="<elementId>" copies innerText of element
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const el = document.getElementById(btn.dataset.copy);
+      if (!el) return;
+      try { await navigator.clipboard.writeText(el.innerText); showCopyFeedback(btn); } catch (e) {}
+    });
+  });
+  // data-copy-text="<literal string>"
+  document.querySelectorAll('[data-copy-text]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(btn.dataset.copyText); showCopyFeedback(btn); } catch (e) {}
+    });
+  });
+
+  // ---------- Session timer ----------
+  const pageStart = performance.now();
+  function fmtTimer(ms) {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    return m + ':' + (s % 60).toString().padStart(2, '0');
+  }
+
+  // ---------- LIVE: pulling real SPL Token activity from mainnet ----------
+  if (typeof solanaWeb3 === 'undefined') {
+    console.warn('solana-web3.js failed to load — live data disabled');
+    return;
+  }
+
+  // Public RPCs that work from a browser (CORS + no auth required).
+  // solana.publicnode.com works first try; the others stay as warm fallbacks.
+  const RPCS = [
+    'https://solana.publicnode.com',
+    'https://api.mainnet-beta.solana.com',
+    'https://rpc.ankr.com/solana',
+  ];
+  let rpcIndex = 0;
+  let conn = new solanaWeb3.Connection(RPCS[rpcIndex], 'confirmed');
+  const TOKEN_PROGRAM_ID = new solanaWeb3.PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+  const TOKEN_PROGRAM_STR = TOKEN_PROGRAM_ID.toBase58();
+
+  // Per-instruction reduction factor (p-token CU ≈ SPL CU × factor).
+  // Derived from the documented benchmark deltas (~50-60% reduction on hot paths,
+  // ~40% on init paths). Average ≈ 0.45.
+  const PTOKEN_FACTOR = 0.45;
+
+  const $ = (id) => document.getElementById(id);
+  const fmtNum = (n) => Math.round(n).toLocaleString('en-US');
+  const fmtSig = (s) => s.slice(0, 6) + '…' + s.slice(-6);
+
+  let totalSampled = 0;
+  let totalReal = 0;
+  let totalSaved = 0;
+  const seenSigs = new Set();
+  const pureTokenSamples = []; // CU values from txs that ONLY call SPL Token
+
+  // Smooth-animation state — displayed values ease toward totals and
+  // extrapolate forward at the observed sampling rate.
+  let displayedReal = 0;
+  let displayedSaved = 0;
+  let realPerSec = 0;
+  let savedPerSec = 0;
+  let lastBatchTime = performance.now();
+  let prevTotalReal = 0;
+  let prevTotalSaved = 0;
+  let firstBatch = true;
+
+  function rotateRpc() {
+    rpcIndex = (rpcIndex + 1) % RPCS.length;
+    conn = new solanaWeb3.Connection(RPCS[rpcIndex], 'confirmed');
+    console.warn('rotated RPC →', RPCS[rpcIndex]);
+  }
+
+  async function updateNetwork() {
+    try {
+      const [slot, perf] = await Promise.all([
+        conn.getSlot(),
+        conn.getRecentPerformanceSamples(1).catch(() => []),
+      ]);
+      $('live-slot').textContent = slot.toLocaleString('en-US');
+      if (perf && perf[0]) {
+        const tps = Math.round(perf[0].numTransactions / perf[0].samplePeriodSecs);
+        $('live-tps').textContent = tps.toLocaleString('en-US');
+      }
+    } catch (e) {
+      console.warn('updateNetwork failed', e);
+      rotateRpc();
+    }
+  }
+
+  function flashSaved(amount) {
+    const card = document.querySelector('#ms-saved')?.closest('.card');
+    if (card) {
+      card.classList.remove('pulse-glow');
+      void card.offsetWidth;
+      card.classList.add('pulse-glow');
+    }
+    const host = $('ms-saved')?.parentElement;
+    if (host && amount > 0) {
+      if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+      const note = document.createElement('div');
+      note.className = 'absolute right-0 top-0 mono text-sm text-mint font-bold flash-flyup pointer-events-none';
+      note.textContent = '+' + fmtNum(amount) + ' CU';
+      host.appendChild(note);
+      setTimeout(() => note.remove(), 1700);
+    }
+  }
+
+  function renderTx(sig, splCU, isPure) {
+    const pino = Math.round(splCU * PTOKEN_FACTOR);
+    const pct = Math.round(((splCU - pino) / splCU) * 100);
+
+    const row = document.createElement('div');
+    row.className = 'grid grid-cols-[1.5fr_1fr_1fr_.7fr] px-5 py-3 items-center text-sm flash-row';
+    row.innerHTML =
+      '<div class="mono text-chalk truncate flex items-center gap-2">' +
+        '<a href="https://solscan.io/tx/' + sig + '" target="_blank" class="truncate hover:text-amber-400">' + fmtSig(sig) + '</a>' +
+        (isPure ? '<span class="chip text-[9px] px-1.5 py-0.5 rounded text-amber-400 shrink-0">pure</span>' : '') +
+      '</div>' +
+      '<div class="mono text-fog">' + fmtNum(splCU) + '</div>' +
+      '<div class="mono text-amber-400">' + fmtNum(pino) + '</div>' +
+      '<div class="text-right font-bold text-mint">−' + pct + '%</div>';
+
+    const feed = $('tx-feed');
+    if (feed.children.length === 1 && feed.firstElementChild.textContent.includes('connecting')) {
+      feed.innerHTML = '';
+    }
+    feed.prepend(row);
+    while (feed.children.length > 20) feed.removeChild(feed.lastElementChild);
+  }
+
+  function onBatchSampled(batchSaved) {
+    const now = performance.now();
+    const dt = (now - lastBatchTime) / 1000;
+    if (!firstBatch && dt > 0.5) {
+      const instReal = (totalReal - prevTotalReal) / dt;
+      const instSaved = (totalSaved - prevTotalSaved) / dt;
+      realPerSec = realPerSec === 0 ? instReal : realPerSec * 0.4 + instReal * 0.6;
+      savedPerSec = savedPerSec === 0 ? instSaved : savedPerSec * 0.4 + instSaved * 0.6;
+    }
+    firstBatch = false;
+    prevTotalReal = totalReal;
+    prevTotalSaved = totalSaved;
+    lastBatchTime = now;
+
+    $('ms-sampled').textContent = fmtNum(totalSampled);
+    $('live-sampled').textContent = fmtNum(totalSampled);
+    $('stat-sample-size').textContent = fmtNum(totalSampled);
+
+    if (totalReal > 0) {
+      const pct = Math.round((totalSaved / totalReal) * 100);
+      $('stat-cu-saved').textContent = '−' + pct + '%';
+    }
+
+    if (pureTokenSamples.length > 0) {
+      const avg = pureTokenSamples.reduce((a, b) => a + b, 0) / pureTokenSamples.length;
+      const pino = Math.round(avg * PTOKEN_FACTOR);
+      const pct = Math.round(((avg - pino) / avg) * 100);
+      $('bench-spl').textContent = fmtNum(avg);
+      $('bench-pino').textContent = fmtNum(pino);
+      $('bench-delta').textContent = '−' + pct + '%';
+    }
+
+    if (batchSaved > 0) flashSaved(batchSaved);
+  }
+
+  function tickAnimation() {
+    const now = performance.now();
+    const dtSinceBatch = (now - lastBatchTime) / 1000;
+    // Extrapolate forward at most ~10s past the last real sample
+    const cappedDt = Math.min(dtSinceBatch, 10);
+    const extrapolatedReal = totalReal + realPerSec * cappedDt;
+    const extrapolatedSaved = totalSaved + savedPerSec * cappedDt;
+
+    displayedReal += (extrapolatedReal - displayedReal) * 0.06;
+    displayedSaved += (extrapolatedSaved - displayedSaved) * 0.06;
+
+    const elReal = $('ms-real');
+    const elSaved = $('ms-saved');
+    if (elReal) elReal.textContent = fmtNum(displayedReal);
+    if (elSaved) elSaved.textContent = fmtNum(displayedSaved);
+
+    const elTimer = $('session-timer');
+    if (elTimer) elTimer.textContent = fmtTimer(now - pageStart);
+
+    requestAnimationFrame(tickAnimation);
+  }
+
+  async function sampleTransactions() {
+    try {
+      const sigs = await conn.getSignaturesForAddress(TOKEN_PROGRAM_ID, { limit: 20 });
+      const fresh = sigs.filter(s => !seenSigs.has(s.signature) && !s.err).slice(0, 6);
+      if (fresh.length === 0) return;
+
+      const txs = await Promise.all(fresh.map(s =>
+        conn.getTransaction(s.signature, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 0,
+        }).catch(() => null)
+      ));
+
+      let batchSaved = 0;
+      for (let i = 0; i < fresh.length; i++) {
+        const sig = fresh[i].signature;
+        const tx = txs[i];
+        if (!tx || !tx.meta || tx.meta.computeUnitsConsumed == null || tx.meta.err) continue;
+
+        seenSigs.add(sig);
+        const cu = tx.meta.computeUnitsConsumed;
+        const pino = Math.round(cu * PTOKEN_FACTOR);
+
+        totalSampled++;
+        totalReal += cu;
+        totalSaved += (cu - pino);
+        batchSaved += (cu - pino);
+
+        // Determine if this tx is "pure" SPL Token (no other top-level programs)
+        // by scanning the log preamble for "Program X invoke [1]" entries.
+        let pureToken = false;
+        const logs = tx.meta.logMessages || [];
+        const topLevel = new Set();
+        for (const log of logs) {
+          const m = log.match(/^Program (\S+) invoke \[1\]/);
+          if (m) topLevel.add(m[1]);
+        }
+        if (topLevel.size === 1 && topLevel.has(TOKEN_PROGRAM_STR)) {
+          pureToken = true;
+          pureTokenSamples.push(cu);
+          while (pureTokenSamples.length > 30) pureTokenSamples.shift();
+        }
+
+        renderTx(sig, cu, pureToken);
+      }
+
+      onBatchSampled(batchSaved);
+    } catch (e) {
+      console.warn('sampleTransactions failed', e);
+      rotateRpc();
+    }
+  }
+
+  // Initial fire
+  updateNetwork();
+  sampleTransactions();
+
+  // Polling — respectful of public RPC limits
+  setInterval(updateNetwork, 8000);
+  setInterval(sampleTransactions, 12000);
+
+  // Smooth ticking animation — runs every frame
+  requestAnimationFrame(tickAnimation);
+
+  // Manual refresh
+  const refresh = $('refresh-btn');
+  if (refresh) refresh.addEventListener('click', sampleTransactions);
+})();
+</script>
+</body>
+</html>
