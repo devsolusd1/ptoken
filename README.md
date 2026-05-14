@@ -29,7 +29,7 @@ No build step. Pure HTML + Tailwind via CDN + `@solana/web3.js` via CDN.
 
 ## Contract
 
-`gENFYvwL1qN8qFJxewhCzyvNXonEHreFXiE6AK8pino`
+`6iy9ZU4KErJ9uREL7dQTc5BXTbKK3bbyV9Z3A4BPTKN`
 
 ## License
 
